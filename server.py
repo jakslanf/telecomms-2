@@ -41,6 +41,13 @@ def clients_thread(clientsocket, address, data):
     print(data)
     json_data = json.loads(data)
     print(type(json_data))
+    print(type(json_data["key"]))
     return 0
+
+def check_client_key():
+    return
+
+def exchange_keys():
+    return
 
 run_cloud(6060)
