@@ -1,0 +1,9 @@
+python client.py [username] [command] [group] [file]
+python client.py [username] HELLO %% establish a connection with the server
+python client.py [username] ADD [group] [file] %% add a file to a group folder
+python client.py [username] REMOVE [group]  [file] %% add a file to a group folder
+python client.py [username] VIEW [group] [file] %% view a list of files in a group folder
+python client.py [username] VIEW [group] %% view a list of groups you have access to
+
+python client.py paul ADD book_club hello_world.txt
+python client.py paul REMOVE book_club hello_world.txt

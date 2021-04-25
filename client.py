@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 import os
+import base64
 encoding = 'utf-8'
 
 BUFFER_SIZE = 40960
@@ -19,7 +20,10 @@ private_key = 1
 public_key = -1
 server_key = -1
 location = -1
-username = -1
+username = ""
+command_wanted = ""
+group_wanted = ""
+file_wanted = ""
 done = False
 
 # Function:
@@ -31,65 +35,41 @@ done = False
 # Return: 
 def start_socket(login, port):
     global server_key
+    global command_wanted
+    global group_wanted
+    global file_wanted
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    host = socket.gethostname()
+    #host = socket.gethostname()
     port = 6060
 
     client_socket.connect(("127.0.0.1", port))
-    data = build_json(username,key=public_key,flag="HELLO")
+    server_key = load_server_key_file()
+    #data = build_json(username,key=public_key,flag=command_wanted,group=group_wanted,filename=file_wanted)
+    if (command_wanted == "ADD"):
+        file_data = encrypt_for_server(load_file(file_wanted))
+        data = build_json(username,key=public_key,flag=command_wanted,group=group_wanted,filename=file_wanted,encrypdata=file_data)
+    if (command_wanted == "REMOVE"):
+        file_data = encrypt_for_server(load_file(file_wanted))
+        data = build_json(username,key=public_key,flag=command_wanted,group=group_wanted,filename=file_wanted)
     print(type(data))
     client_socket.sendall(data)
-    #client_socket.settimeout(5)
-    reply = bytes()
-    reply += client_socket.recv(BUFFER_SIZE) 
-    print(reply)
-    json_data=json.loads(reply)
-    if not does_server_key_exist():
-        print("Sever key for does not already exist in storage, writing now")
-        write_server_key_file(json_data["key"].encode(encoding='utf-8'))
-    server_key = load_server_key_file()
-    encrypt_for_server(b'pee')
-    print("Encrypted connection established with server")
-    while(not done):
-        input()
+    if (command_wanted == "HELLO" or command_wanted == "VIEW" or command_wanted == "GET"):
+        reply = bytes()
+        reply = recvall(client_socket)
+        print(reply)
+        json_data=json.loads(reply)
+        if not does_server_key_exist():
+            print("Sever key for does not already exist in storage, writing now")
+            write_server_key_file(json_data["key"].encode(encoding='utf-8'))
+        server_key = load_server_key_file()
+        print("Encrypted connection established with server")
     #print(decrypt_from_server(reply))
+    client_socket.close()
     return
 
-# Function: add_file
-# Usage: used for adding a file to the cloud, must mention user and group
-# Return: 
-def add_file_message(file):
-    return 0
+def load_file(file):
+    return open(location + "/files/" + file_wanted, "rb").read()
 
-# Function: get_file
-# Usage: used for getting a file from the cloud, must mention user and group
-# Return: 
-def get_file_message(file):
-    return 0
-
-# Function: get_file
-# Usage: used for getting a file from the cloud, must mention user and group
-# Return: 
-def remove_file_message(file):
-    return 0
-
-# Function: view_files
-# Usage: used for viewing the list of files in a specific group, must mention user and group
-# Return: 
-def view_files_message(file):
-    return 0
-
-# Function: view groups
-# Usage: used for viewing a list of groups the user is in
-# Return: nothing
-def view_groups_message(file):
-    return 0
-
-# Function: get server key
-# Usage: used for getting the server's public key
-# Return: nothing
-def get_server_key():
-    return 0
 
 # Function: encrypt_for_server
 # Usage: encrypts data using the server's public key
@@ -109,8 +89,10 @@ def encrypt_for_server(data_to_encrypt):
 # Usage: decrypts data from the server using the private key of the client
 # Return: nothing
 def decrypt_from_server(encryted_data):
+    encrypted_b64 = encryted_data.encode()
+    encrypted = base64.b64decode(encrypted_b64)
     data = private_key.decrypt(
-         encryted_data,
+         encrypted,
          padding.OAEP(
              mgf=padding.MGF1(algorithm=hashes.SHA256()),
              algorithm=hashes.SHA256(),
@@ -137,20 +119,23 @@ def recvall(sock):
 # Function: build_json
 # Usage: builds a json file of data to be sent in over a socket connection, used to transfer data between client and server
 # Return: the json file of data
-def build_json(username, key="", flag="", group="", filename="", data="", group_key=""):
+def build_json(username, key="", flag="", group="", filename="", encrypdata=b'', group_key=""):
     public_pem = public_key.public_bytes(
     encoding=serialization.Encoding.PEM,
     format=serialization.PublicFormat.SubjectPublicKeyInfo
     )  
+    encrypted_b64 = base64.b64encode(encrypdata)
+    encrypted_b64_string = encrypted_b64.decode()
     json_build = {
     "username": username,
     "flag": flag,
     "key": public_pem.decode(encoding='utf-8'),
     "group": group,
-    "group key": group_key,
+    "group_key": group_key,
     "filename": filename,
-    "data": data
-    }   
+    "data": encrypted_b64_string
+    }
+    print(type(json_build["data"]))
     return json.dumps(json_build).encode(encoding='utf-8')
 
 # Function: initialise_keys
@@ -233,32 +218,47 @@ def do_keys_exist():
     print(os.path.dirname(location + '/keys/public_key.pem'))
     return os.path.isfile(location + '/keys/public_key.pem') and os.path.isfile(location + '/keys/private_key.pem')
 
+def print_help():
+    print("Here's a list of handy commands %% replace anything in brackets with the appropriate name")
+    print("python client.py [username] [command] [group] [file]")
+    print("python client.py [username] HELLO %% establish a connection with the server")
+    print("python client.py [username] ADD [group] [file] %% add a file to a group folder")
+    print("python client.py [username] REMOVE [group]  [file] %% add a file to a group folder")
+    print("python client.py [username] VIEW [group] [file] %% view a list of files in a group folder")
+    print("python client.py [username] VIEW [group] /%% view a list of groups you have access to")
+
 # Function: main
 # Usage: runs code on main, takes two arguments (username and port no.) on startup, otherwise defaults to user Paul
 # Return: nothing
 def main():
     global location
     global username
-    port = -1
+    global command_wanted
+    global group_wanted
+    global file_wanted
+    port = 6060
     print("Booting up client")
     print(len(sys.argv))
-    if(len(sys.argv)==3):
+    if(len(sys.argv)==4 or len(sys.argv)==5):
         print("Using command line arguments")
-        login = sys.argv[1]
-        port = int(sys.argv[2])
+        login = str(sys.argv[1])
+        command_wanted = str(sys.argv[2])
+        group_wanted = str(sys.argv[3])
+        file_wanted = ""
+        if len(sys.argv)==5:
+            file_wanted = sys.argv[4]
+        location = 'client_files/user/' + login
+        username = login
+        if(do_keys_exist()):
+            load_key_files()
+        else:
+            print("User " + username + " does not exist, generating keys for new user")
+            initialise_keys()
+            load_key_files()
+        start_socket(login,port)
     else:
-        print("Using default login, paul")
-        login = "paul"
-        port = 6060
-    location = 'client_files/user/' + login
-    username = login
-    if(do_keys_exist()):
-        load_key_files()
-    else:
-        print("User " + username + " does not exist, generating keys for new user")
-        initialise_keys()
-        load_key_files()
-    start_socket(login,port)
+        print("ERROR: Invalid Arguments")
+        print_help()
 
 if __name__ == "__main__":
     main()
