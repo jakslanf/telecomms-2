@@ -179,6 +179,8 @@ def load_key_files():
         backend=default_backend()
     )
 
+def load_server_key_file():
+    return 0
 
 # Function: do_keys_exist
 # Usage: Checks that there are locally stored private and public keys for the user
