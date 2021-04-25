@@ -37,6 +37,10 @@ def start_socket(login, port):
     data = build_json("paul",key=public_key,flag="HELLO")
     print(type(data))
     client_socket.sendall(data)
+    #client_socket.settimeout(5)
+    reply = bytes()
+    reply += client_socket.recv(BUFFER_SIZE)  
+    print(decrypt_from_server(reply))
     #client_socket.sendall(data)
     return
 

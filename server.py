@@ -49,19 +49,40 @@ def clients_thread(clientsocket, address, data):
         print("creating new file")
         write_client_key_file(json_data["username"],json_data["key"].encode(encoding='utf-8'))
     client_key = load_client_key_file(json_data["username"])
-    message = b'hello'
+    print(is_same_key(json_data["username"], client_key))
+    message_to_encrypt = b'hello darling'
+    clientsocket.send(encrypt_for_client(message_to_encrypt,client_key))
     return 0
 
 def is_same_key(username, maybe_client_public_key):
-    new_pem = public_key.public_bytes(
+    new_pem =  maybe_client_public_key.public_bytes(
     encoding=serialization.Encoding.PEM,
     format=serialization.PublicFormat.SubjectPublicKeyInfo
     )  
     stored_pem = load_client_key_file(username).public_bytes(
     encoding=serialization.Encoding.PEM,
     format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )  
+    )
     return (str(new_pem) == str(stored_pem))
+
+# Function: build_json
+# Usage: builds a json file of data to be sent in over a socket connection, used to transfer data between client and server
+# Return: the json file of data
+def build_json(username, key="", flag="", group="", filename="", data="", group_key=""):
+    public_pem = public_key.public_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )  
+    json_build = {
+    "username": username,
+    "flag": flag,
+    "key": public_pem.decode(encoding='utf-8'),
+    "group": group,
+    "group key": group_key,
+    "filename": filename,
+    "data": data
+    }   
+    return json.dumps(json_build).encode(encoding='utf-8')
 
 # Function: does_client_key_exist
 # Usage: Checks that there are locally stored public key for client
@@ -148,9 +169,9 @@ def encrypt_for_client(data_to_encrypt,client_key):
     encryted_data = client_key.encrypt(
      data_to_encrypt,
      padding.OAEP(
-         mgf=padding.MGF1(algorithm=hashes.SHA256()),
-         algorithm=hashes.SHA256(),
-         label=None
+        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+        algorithm=hashes.SHA256(),
+        label=None
      )
     )
     return encryted_data
