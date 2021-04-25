@@ -20,6 +20,7 @@ public_key = -1
 server_key = -1
 location = -1
 username = -1
+done = False
 
 # Function:
 # Usage: 
@@ -29,49 +30,59 @@ username = -1
 # Usage: starts a connection with the 
 # Return: 
 def start_socket(login, port):
+    global server_key
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     host = socket.gethostname()
     port = 6060
 
     client_socket.connect(("127.0.0.1", port))
-    data = build_json("paul",key=public_key,flag="HELLO")
+    data = build_json(username,key=public_key,flag="HELLO")
     print(type(data))
     client_socket.sendall(data)
     #client_socket.settimeout(5)
     reply = bytes()
-    reply += client_socket.recv(BUFFER_SIZE)  
-    print(decrypt_from_server(reply))
-    #client_socket.sendall(data)
+    reply += client_socket.recv(BUFFER_SIZE) 
+    print(reply)
+    json_data=json.loads(reply)
+    if not does_server_key_exist():
+        print("Sever key for does not already exist in storage, writing now")
+        write_server_key_file(json_data["key"].encode(encoding='utf-8'))
+    server_key = load_server_key_file()
+    encrypt_for_server(b'pee')
+    print("Encrypted connection established with server")
+    while(not done):
+        input()
+    #print(decrypt_from_server(reply))
     return
 
 # Function: add_file
 # Usage: used for adding a file to the cloud, must mention user and group
 # Return: 
-def add_file(file):
+def add_file_message(file):
     return 0
 
 # Function: get_file
 # Usage: used for getting a file from the cloud, must mention user and group
 # Return: 
-def get_file(file):
+def get_file_message(file):
     return 0
 
 # Function: get_file
 # Usage: used for getting a file from the cloud, must mention user and group
 # Return: 
-def remove_file(file):
+def remove_file_message(file):
     return 0
 
 # Function: view_files
 # Usage: used for viewing the list of files in a specific group, must mention user and group
 # Return: 
-def view_files(file):
+def view_files_message(file):
     return 0
 
 # Function: view groups
 # Usage: used for viewing a list of groups the user is in
 # Return: nothing
-def view_groups(file):
+def view_groups_message(file):
     return 0
 
 # Function: get server key
@@ -113,6 +124,15 @@ def decrypt_from_server(encryted_data):
 # Return: nothing
 def decrypt_group_data():
     return 0
+
+def recvall(sock):
+    recvdata = b''
+    while True:
+        part = sock.recv(BUFFER_SIZE)
+        recvdata += part
+        if len(part) < BUFFER_SIZE:
+            break
+    return recvdata
 
 # Function: build_json
 # Usage: builds a json file of data to be sent in over a socket connection, used to transfer data between client and server
@@ -184,8 +204,27 @@ def load_key_files():
         backend=default_backend()
     )
 
+
+# Function: does_client_key_exist
+# Usage: Checks that there are locally stored public key for client
+# Return: True if key exists locally
+def does_server_key_exist():
+    print("Checking for server key in storage")
+    print(os.path.isfile(location + "/keys/server_public_key.pem"))
+    return os.path.isfile(location + "/keys/server_public_key.pem")
+
 def load_server_key_file():
-    return 0
+    with open(location + "/keys/server_public_key.pem", "rb") as key_file:
+        server_public_key = serialization.load_pem_public_key(
+        key_file.read(),
+        backend=default_backend()
+    )
+    return server_public_key
+
+def write_server_key_file(server_pem):
+    #os.makedirs(os.path.dirname(location + "user/" + client_name + "/public_key.pem"), exist_ok=True)
+    with open(location + "/keys/server_public_key.pem", 'wb') as f1:
+        f1.write(server_pem)
 
 # Function: do_keys_exist
 # Usage: Checks that there are locally stored private and public keys for the user
@@ -204,9 +243,11 @@ def main():
     print("Booting up client")
     print(len(sys.argv))
     if(len(sys.argv)==3):
+        print("Using command line arguments")
         login = sys.argv[1]
         port = int(sys.argv[2])
     else:
+        print("Using default login, paul")
         login = "paul"
         port = 6060
     location = 'client_files/user/' + login

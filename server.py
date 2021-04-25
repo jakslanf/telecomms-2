@@ -45,13 +45,57 @@ def clients_thread(clientsocket, address, data):
     print(type(data))
     print(data)
     json_data = json.loads(data)
-    if not does_client_key_exist(json_data["username"]):
-        print("creating new file")
-        write_client_key_file(json_data["username"],json_data["key"].encode(encoding='utf-8'))
-    client_key = load_client_key_file(json_data["username"])
-    print(is_same_key(json_data["username"], client_key))
-    message_to_encrypt = b'hello darling'
-    clientsocket.send(encrypt_for_client(message_to_encrypt,client_key))
+    user = json_data["username"]
+    if not does_client_key_exist(user):
+        print("Client key for " + user + " does not already exist in storage, writing now")
+        write_client_key_file(user,json_data["key"].encode(encoding='utf-8'))
+    client_key = load_client_key_file(user)
+    if(json_data["flag"] == "HELLO"):
+        response_to_client = build_json(user,key=public_key,flag="HELLO")
+        clientsocket.send(response_to_client)
+        print("Encrypted connection established with client " + user)
+    elif (json_data["flag"] == "ADD"):
+        response_to_client = add_file_message(json_data)
+        clientsocket.sendall(response_to_client)
+    elif (json_data["flag"] == "REMOVE"):
+        response_to_client = remove_file_message(json_data)
+        clientsocket.sendall(response_to_client)
+    elif (json_data["flag"] == "VIEW" and json_data["group"] == "" ):
+        response_to_client = view_groups_message(json_data)
+        clientsocket.sendall(response_to_client)
+    elif (json_data["flag"] == "VIEW"):
+        response_to_client = view_files_message(json_data)
+        clientsocket.sendall(response_to_client)
+    return 0
+
+# Function: add_file
+# Usage: used for adding a file to the cloud, must mention user and group
+# Return: 
+def add_file_message(json_data):
+    return 0
+
+# Function: get_file
+# Usage: used for getting a file from the cloud, must mention user and group
+# Return: 
+def get_file_message(json_data):
+    return 0
+
+# Function: get_file
+# Usage: used for getting a file from the cloud, must mention user and group
+# Return: 
+def remove_file_message(json_data):
+    return 0
+
+# Function: view_files
+# Usage: used for viewing the list of files in a specific group, must mention user and group
+# Return: 
+def view_files_message(json_data):
+    return 0
+
+# Function: view groups
+# Usage: used for viewing a list of groups the user is in
+# Return: nothing
+def view_groups_message(json_data):
     return 0
 
 def is_same_key(username, maybe_client_public_key):
@@ -101,7 +145,7 @@ def load_client_key_file(client_name):
     return client_public_key
 
 def write_client_key_file(client_name, client_pem):
-    #os.makedirs(os.path.dirname(location + "user/" + client_name + "/public_key.pem"), exist_ok=True)
+    os.makedirs(os.path.dirname(location + "user/" + client_name + "/public_key.pem"), exist_ok=True)
     with open(location + "user/" + client_name + "/public_key.pem", 'wb') as f1:
         f1.write(client_pem)
 
@@ -129,6 +173,7 @@ def initialise_keys():
 # Return: nothing
 def write_key_files(public_pem, private_pem):
     if not os.path.exists(os.path.dirname(location + '/keys/')):
+        os.makedirs(os.path.dirname(location), exist_ok=True)
         os.makedirs(os.path.dirname(location + '/keys/'), exist_ok=True)
         os.makedirs(os.path.dirname(location + '/files/'), exist_ok=True)
     with open(location + '/keys/'+'public_key.pem', 'wb') as f1:
