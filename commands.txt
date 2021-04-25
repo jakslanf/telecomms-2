@@ -7,6 +7,7 @@ python client.py [username] VIEW [group] %% view a list of groups you have acces
 
 python client.py paul ADD book_club hello_world.txt
 python client.py paul REMOVE book_club hello_world.txt
+python client.py paul VIEW book_club hello_world.txt
 
 "username": username,
     "flag": flag,

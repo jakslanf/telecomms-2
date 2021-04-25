@@ -63,13 +63,23 @@ def start_socket(login, port):
             print("Sever key for does not already exist in storage, writing now")
             write_server_key_file(json_data["key"].encode(encoding='utf-8'))
         server_key = load_server_key_file()
-        print("Encrypted connection established with server")
-        print(decrypt_from_server(json_data["data"]))
+        if command_wanted == "HELLO":
+            print("Encrypted connection established with server")
+        if command_wanted == "VIEW":
+            print("Directory:\n" + decrypt_from_server(json_data["data"]).decode())
+        if command_wanted == "GET":
+            save_file(decrypt_from_server(json_data["data"]))
+            print("File " + json_data["filename"] + " has been downloaded from the cloud")
     client_socket.close()
     return
 
 def load_file(file):
     return open(location + "/files/" + file_wanted, "rb").read()
+
+def save_file(file):
+    f = open(location + "/files/" + file_wanted, "wb")
+    f.write(file)
+    f.close()
 
 
 # Function: encrypt_for_server
@@ -136,7 +146,6 @@ def build_json(username, key="", flag="", group="", filename="", encrypdata=b'',
     "filename": filename,
     "data": encrypted_b64_string
     }
-    print(type(json_build["data"]))
     return json.dumps(json_build).encode(encoding='utf-8')
 
 # Function: initialise_keys
@@ -195,8 +204,6 @@ def load_key_files():
 # Usage: Checks that there are locally stored public key for client
 # Return: True if key exists locally
 def does_server_key_exist():
-    print("Checking for server key in storage")
-    print(os.path.isfile(location + "/keys/server_public_key.pem"))
     return os.path.isfile(location + "/keys/server_public_key.pem")
 
 def load_server_key_file():
@@ -216,7 +223,6 @@ def write_server_key_file(server_pem):
 # Usage: Checks that there are locally stored private and public keys for the user
 # Return: True if both keys are stored locally, false if otherwise
 def do_keys_exist():
-    print(os.path.dirname(location + '/keys/public_key.pem'))
     return os.path.isfile(location + '/keys/public_key.pem') and os.path.isfile(location + '/keys/private_key.pem')
 
 def print_help():
@@ -227,6 +233,7 @@ def print_help():
     print("python client.py [username] REMOVE [group]  [file] %% add a file to a group folder")
     print("python client.py [username] VIEW [group] [file] %% view a list of files in a group folder")
     print("python client.py [username] VIEW [group] /%% view a list of groups you have access to")
+    print("python client.py [username] GET [group] [file] %% retrieve a file stored in a group folder")
 
 # Function: main
 # Usage: runs code on main, takes two arguments (username and port no.) on startup, otherwise defaults to user Paul
@@ -238,16 +245,13 @@ def main():
     global group_wanted
     global file_wanted
     port = 6060
-    print("Booting up client")
-    print(len(sys.argv))
     if(len(sys.argv)==4 or len(sys.argv)==5 or len(sys.argv)==3):
-        print("Using command line arguments")
         login = str(sys.argv[1])
         command_wanted = str(sys.argv[2])
-        if len(sys.argv)==4:
+        if len(sys.argv)>3:
             group_wanted = str(sys.argv[3])
         file_wanted = ""
-        if len(sys.argv)==5:
+        if len(sys.argv)>=5:
             file_wanted = sys.argv[4]
         location = 'client_files/user/' + login
         username = login

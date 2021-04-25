@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.fernet import Fernet
 import os
 import base64
 encoding = 'utf-8'
@@ -22,6 +23,7 @@ location = "server_files/"
 
 private_key = 1
 public_key = -1
+fernet_key = -1
 
 def run_cloud(proxy_port):
     serversocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -43,7 +45,6 @@ def run_cloud(proxy_port):
 
 def clients_thread(clientsocket, address, data):
     data = data.decode(encoding='utf-8')
-    print(type(data))
     print(data)
     json_data = json.loads(data)
     user = json_data["username"]
@@ -53,7 +54,7 @@ def clients_thread(clientsocket, address, data):
     client_key = load_client_key_file(user)
     if(json_data["flag"] == "HELLO"):
         response_to_client = build_json(user,key=public_key,flag="HELLO")
-        clientsocket.send(response_to_client)
+        clientsocket.sendall(response_to_client)
         print("Encrypted connection established with client " + user)
     elif (json_data["flag"] == "ADD"):
         response_to_client = add_file_message(json_data,client_key)
@@ -72,6 +73,10 @@ def clients_thread(clientsocket, address, data):
         response_to_client = view_files_message(json_data,client_key)
         clientsocket.sendall(response_to_client)
         print("Files viewd by " + user)
+    elif (json_data["flag"] == "GET"):
+        response_to_client = get_file_message(json_data,client_key)
+        clientsocket.sendall(response_to_client)
+        print("File downloaded by " + user)
     clientsocket.close()
     return 0
 
@@ -83,7 +88,6 @@ def add_file_message(json_data,client_key):
         return -1
     encrypted_data = json_data["data"]
     normal_data = decrypt_from_client(encrypted_data)
-    print(normal_data)
     add_file_to_group(json_data["group"],json_data["filename"],normal_data)
     #are they authorised for this group?
     #decrypt the data in question
@@ -92,19 +96,24 @@ def add_file_message(json_data,client_key):
     return 0
 
 def add_file_to_group(group,filename, filedata):
+    encrypted_data = fernet_encrypt(filedata)
     f = open(location + 'group/'+group+"/"+filename, "wb")
-    f.write(filedata)
+    f.write(encrypted_data)
     f.close()
 
 # Function: get_file
 # Usage: used for getting a file from the cloud, must mention user and group
 # Return: 
 def get_file_message(json_data,client_key):
-    return_data = -1
+    normal_data = load_file(json_data["group"],json_data["filename"])
+    encrypted_data = encrypt_for_client(normal_data,client_key)
     #are they authorised for this group?
     #send encrypted data
     #encrypt the group key and send too
-    return return_data
+    return build_json(json_data["username"],flag="GET",encrypdata=encrypted_data,group=json_data["group"],filename=json_data["filename"])
+
+def load_file(group,filename):
+    return fernet_decrypt(open(location + 'group/'+group+"/"+filename, "rb").read())
 
 # Function: get_file
 # Usage: used for getting a file from the cloud, must mention user and group
@@ -125,10 +134,10 @@ def remove_file_from_group(group,filename):
 # Usage: used for viewing the list of files in a specific group, must mention user and group
 # Return: 
 def view_files_message(json_data,client_key):
-    return_data = -1
-    #are they authorised for this group?
-     #send back a list of file names encrypted
-    return return_data
+    normal_data = get_group_file_list(json_data["group"])
+    encrypted_data = encrypt_for_client(normal_data.encode(encoding='utf-8'),client_key)
+    #send back a list of groups they are authorised for
+    return build_json(json_data["username"],flag="VIEW",encrypdata=encrypted_data,group=json_data["group"])
 
 # Function: view groups
 # Usage: used for viewing a list of groups the user is in
@@ -243,7 +252,6 @@ def build_json(username, key="", flag="", group="", filename="", encrypdata=b'',
     "filename": filename,
     "data": encrypted_b64_string
     }
-    print(type(json_build["data"]))
     return json.dumps(json_build).encode(encoding='utf-8')
 
 # Function: does_client_key_exist
@@ -267,7 +275,28 @@ def write_client_key_file(client_name, client_pem):
     with open(location + "user/" + client_name + "/public_key.pem", 'wb') as f1:
         f1.write(client_pem)
     
+def fernet_encrypt(data):
+    f = Fernet(fernet_key)
+    encrypted_data = f.encrypt(data)
+    return encrypted_data
 
+def fernet_decrypt(data):
+    f = Fernet(fernet_key)
+    decrypted_data = f.decrypt(data)
+    return decrypted_data
+
+def fernet_write_key():
+    print("Fernet key generated")
+    key = Fernet.generate_key()
+    os.makedirs(os.path.dirname(location + 'keys/'+ "fernet.pem"), exist_ok=True)
+    with open(location + 'keys/'+ "fernet.pem", "wb") as key_file:
+        key_file.write(key)
+
+
+def fernet_load_key():
+    if not os.path.isfile(location + 'keys/'+ "fernet.pem"):
+        fernet_write_key()
+    return open(location + 'keys/'+ "fernet.pem", "rb").read()
 
 
 # Function: initialise_keys
@@ -309,7 +338,9 @@ def write_key_files(public_pem, private_pem):
 # Usage: loads the private and public keys for the server and updates the global variables, used on startup
 # Return: nothing
 def load_key_files():
-    global private_key, public_key
+    global private_key, public_key, fernet_key
+    fernet_key = fernet_load_key()
+    print(fernet_key)
     with open(location + 'keys/'+ "private_key.pem", "rb") as key_file:
         private_key = serialization.load_pem_private_key(
         key_file.read(),
@@ -363,10 +394,10 @@ def decrypt_from_client(encryted_data):
 # Usage: runs code on main, takes no arguments
 # Return: nothing
 def main():
-    create_group("hello")
-    add_user_to_group("paul","book_club1")
-    print(get_group_list("paul"))
-    print(get_group_file_list("book_club"))
+    create_group("rabbits")
+    add_user_to_group("paul","rabbits")
+    create_group("cats")
+    add_user_to_group("alice","cats")
     if(do_keys_exist()):
         load_key_files()
     else:
