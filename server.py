@@ -45,18 +45,31 @@ def clients_thread(clientsocket, address, data):
     print(type(data))
     print(data)
     json_data = json.loads(data)
-    print(type(json_data))
-    print(type(json_data["key"]))
-    print(type(json_data["username"]))
-    load_client_key_file(json_data["username"])
-    clientsocket.sendall()
+    if not does_client_key_exist(json_data["username"]):
+        print("creating new file")
+        write_client_key_file(json_data["username"],json_data["key"].encode(encoding='utf-8'))
+    client_key = load_client_key_file(json_data["username"])
+    message = b'hello'
     return 0
 
-def check_client_key():
-    return
+def is_same_key(username, maybe_client_public_key):
+    new_pem = public_key.public_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )  
+    stored_pem = load_client_key_file(username).public_bytes(
+    encoding=serialization.Encoding.PEM,
+    format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )  
+    return (str(new_pem) == str(stored_pem))
 
-def exchange_keys():
-    return
+# Function: does_client_key_exist
+# Usage: Checks that there are locally stored public key for client
+# Return: True if key exists locally
+def does_client_key_exist(client_name):
+    print("checking for file")
+    print(os.path.isfile(location + "user/" + client_name + "/public_key.pem"))
+    return os.path.isfile(location + "user/" + client_name + "/public_key.pem")
 
 def load_client_key_file(client_name):
     with open(location + "user/" + client_name + "/public_key.pem", "rb") as key_file:
@@ -65,6 +78,11 @@ def load_client_key_file(client_name):
         backend=default_backend()
     )
     return client_public_key
+
+def write_client_key_file(client_name, client_pem):
+    #os.makedirs(os.path.dirname(location + "user/" + client_name + "/public_key.pem"), exist_ok=True)
+    with open(location + "user/" + client_name + "/public_key.pem", 'wb') as f1:
+        f1.write(client_pem)
 
 # Function: initialise_keys
 # Usage: used to initialise public and private key values or the user if they don't already exist
@@ -122,6 +140,35 @@ def load_key_files():
 # Return: True if both keys are stored locally, false if otherwise
 def do_keys_exist():
     return os.path.isfile(location + 'keys/public_key.pem') and os.path.isfile(location + 'keys/private_key.pem')
+
+# Function: encrypt_for_server
+# Usage: encrypts data using the server's public key
+# Return: nothing
+def encrypt_for_client(data_to_encrypt,client_key):
+    encryted_data = client_key.encrypt(
+     data_to_encrypt,
+     padding.OAEP(
+         mgf=padding.MGF1(algorithm=hashes.SHA256()),
+         algorithm=hashes.SHA256(),
+         label=None
+     )
+    )
+    return encryted_data
+
+# Function: decrypt_from_server
+# Usage: decrypts data from the server using the private key of the client
+# Return: nothing
+def decrypt_from_client(encryted_data):
+    data = private_key.decrypt(
+         encryted_data,
+         padding.OAEP(
+             mgf=padding.MGF1(algorithm=hashes.SHA256()),
+             algorithm=hashes.SHA256(),
+             label=None
+         )
+     )
+    return data
+
 
 # Function: main
 # Usage: runs code on main, takes no arguments

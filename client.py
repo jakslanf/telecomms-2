@@ -34,7 +34,7 @@ def start_socket(login, port):
     port = 6060
 
     client_socket.connect(("127.0.0.1", port))
-    data = build_json("paul",key=public_key)
+    data = build_json("paul",key=public_key,flag="HELLO")
     print(type(data))
     client_socket.sendall(data)
     #client_socket.sendall(data)
@@ -113,14 +113,15 @@ def decrypt_group_data():
 # Function: build_json
 # Usage: builds a json file of data to be sent in over a socket connection, used to transfer data between client and server
 # Return: the json file of data
-def build_json(username, key="", format="", group="", filename="", data="", group_key=""):
+def build_json(username, key="", flag="", group="", filename="", data="", group_key=""):
     public_pem = public_key.public_bytes(
     encoding=serialization.Encoding.PEM,
     format=serialization.PublicFormat.SubjectPublicKeyInfo
     )  
     json_build = {
     "username": username,
-    "key": str(public_pem),
+    "flag": flag,
+    "key": public_pem.decode(encoding='utf-8'),
     "group": group,
     "group key": group_key,
     "filename": filename,
