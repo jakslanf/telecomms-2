@@ -7,3 +7,11 @@ python client.py [username] VIEW [group] %% view a list of groups you have acces
 
 python client.py paul ADD book_club hello_world.txt
 python client.py paul REMOVE book_club hello_world.txt
+
+"username": username,
+    "flag": flag,
+    "key": public_pem.decode(encoding='utf-8'),
+    "group": group,
+    "group_key": group_key,
+    "filename": filename,
+    "data": encrypted_b64_string

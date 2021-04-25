@@ -79,6 +79,8 @@ def clients_thread(clientsocket, address, data):
 # Usage: used for adding a file to the cloud, must mention user and group
 # Return: 
 def add_file_message(json_data,client_key):
+    if( not is_user_in_group(json_data["username"],json_data["group"])):
+        return -1
     encrypted_data = json_data["data"]
     normal_data = decrypt_from_client(encrypted_data)
     print(normal_data)
@@ -108,6 +110,8 @@ def get_file_message(json_data,client_key):
 # Usage: used for getting a file from the cloud, must mention user and group
 # Return: 
 def remove_file_message(json_data,client_key):
+    if( not is_user_in_group(json_data["username"],json_data["group"])):
+        return -1
     remove_file_from_group(json_data["group"],json_data["filename"])
      #are they authorised for this group?
      #delete file
