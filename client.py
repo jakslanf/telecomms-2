@@ -48,10 +48,11 @@ def start_socket(login, port):
     if (command_wanted == "ADD"):
         file_data = encrypt_for_server(load_file(file_wanted))
         data = build_json(username,key=public_key,flag=command_wanted,group=group_wanted,filename=file_wanted,encrypdata=file_data)
-    if (command_wanted == "REMOVE"):
+    elif (command_wanted == "REMOVE"):
         file_data = encrypt_for_server(load_file(file_wanted))
         data = build_json(username,key=public_key,flag=command_wanted,group=group_wanted,filename=file_wanted)
-    print(type(data))
+    else:
+        data = build_json(username,key=public_key,flag=command_wanted,group=group_wanted,filename=file_wanted)
     client_socket.sendall(data)
     if (command_wanted == "HELLO" or command_wanted == "VIEW" or command_wanted == "GET"):
         reply = bytes()
@@ -63,7 +64,7 @@ def start_socket(login, port):
             write_server_key_file(json_data["key"].encode(encoding='utf-8'))
         server_key = load_server_key_file()
         print("Encrypted connection established with server")
-    #print(decrypt_from_server(reply))
+        print(decrypt_from_server(json_data["data"]))
     client_socket.close()
     return
 
@@ -239,11 +240,12 @@ def main():
     port = 6060
     print("Booting up client")
     print(len(sys.argv))
-    if(len(sys.argv)==4 or len(sys.argv)==5):
+    if(len(sys.argv)==4 or len(sys.argv)==5 or len(sys.argv)==3):
         print("Using command line arguments")
         login = str(sys.argv[1])
         command_wanted = str(sys.argv[2])
-        group_wanted = str(sys.argv[3])
+        if len(sys.argv)==4:
+            group_wanted = str(sys.argv[3])
         file_wanted = ""
         if len(sys.argv)==5:
             file_wanted = sys.argv[4]

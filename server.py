@@ -134,9 +134,26 @@ def view_files_message(json_data,client_key):
 # Usage: used for viewing a list of groups the user is in
 # Return: nothing
 def view_groups_message(json_data,client_key):
-    return_data = -1
+    normal_data = get_group_list(json_data["username"])
+    encrypted_data = encrypt_for_client(normal_data.encode(encoding='utf-8'),client_key)
     #send back a list of groups they are authorised for
-    return return_data
+    return build_json(json_data["username"],flag="VIEW",encrypdata=encrypted_data)
+
+def get_group_list(username):
+    return_string = ""
+    with os.scandir(location+'/group') as listOfEntries:
+        for entry in listOfEntries:
+            if entry.is_dir() and is_user_in_group(username,entry.name):
+                return_string = return_string + entry.name + "\n"
+    return return_string
+
+def get_group_file_list(group):
+    return_string = ""
+    with os.scandir(location+'/group/'+group) as listOfEntries:
+        for entry in listOfEntries:
+            if entry.is_file():
+                return_string = return_string + entry.name + "\n"
+    return return_string
 
 def add_user_to_group(username, group):
     if not does_group_exist(group):
@@ -250,21 +267,7 @@ def write_client_key_file(client_name, client_pem):
     with open(location + "user/" + client_name + "/public_key.pem", 'wb') as f1:
         f1.write(client_pem)
     
-def get_group_list(username):
-    return_string = ""
-    with os.scandir(location+'/group') as listOfEntries:
-        for entry in listOfEntries:
-            if entry.is_dir() and is_user_in_group(username,entry.name):
-                return_string = return_string + entry.name + "\n"
-    return return_string
 
-def get_group_file_list(group):
-    return_string = ""
-    with os.scandir(location+'/group/'+group) as listOfEntries:
-        for entry in listOfEntries:
-            if entry.is_file():
-                return_string = return_string + entry.name + "\n"
-    return return_string
 
 
 # Function: initialise_keys
